@@ -8,27 +8,8 @@ import java.util.zip.ZipOutputStream;
 
 public class Main {
     static StringBuilder logger = new StringBuilder();
-    static final int GAME_PROGRESS_AMT = 2;
-    static final String PARENT_DIR = System.getProperty("user.home") + "/IdeaProjects/files-hometask/src/main/java";
-
-//    public static void start() throws Exception {
-//        for (File item : new File(PARENT_DIR).listFiles()) {
-//            if (item.isDirectory() && item.getName().equals("Games")) {
-//                if (item.delete()) System.out.println("Folder 'Games' already exists! Clearing...");
-//                else {
-//                    System.out.println("Please make sure that you dont have 'Games' directory. " +
-//                            "Program creates it by itself.");
-//                    throw new Exception("Delete Games directory.");
-//                }
-//                break;
-//            }
-//        }
-//        if (new File(PARENT_DIR + "/Games").mkdir())
-//            System.out.println("'Games' successfully created.");
-//        else {
-//            System.out.println("Something went wrong. Clear 'Games' folder, commend Main constructor and try again");
-//        }
-//    }
+    static final int GAME_PROGRESS_AMT = 3; // Regulates amount of files in the archive
+    static final String PARENT_DIR = System.getProperty("user.home");
 
     public static String getRandomFilename(){
         StringBuilder sb = new StringBuilder();
@@ -65,14 +46,16 @@ public class Main {
                     zout.write(buffer);
                     zout.flush();
                     zout.closeEntry();
-
                     if (file.delete())
                         logger.append("File ").append(file.getName())
-                            .append(" was added to zip archive and deleted successfully.")
-                            .append("\n");
+                                .append(" was added to zip archive and deleted successfully.")
+                                .append("\n");
+                    else {
+                        logger.append("Failed deleting ").append(file.getName());
+                    }
                 } catch (Exception ex) {
                     logger.append("File ").append(file.getName())
-                            .append(" could not be saved or deleted, exception -> ")
+                            .append(" could not be packed into the archive, exception -> ")
                             .append(ex.getMessage())
                             .append("\n");
                 }
@@ -112,8 +95,8 @@ public class Main {
             logger.append("Successfully created directory ").append(path)
                     .append("\n");
         else {
-        logger.append("Unable to create directory ").append(path)
-                .append("\n");
+            logger.append("Unable to create directory ").append(path)
+                    .append("\n");
         }
     }
 
@@ -126,11 +109,11 @@ public class Main {
                 return f;
             }
         } catch (IOException ex) {
-            logger.append("Can't create file ").append(filename).append(" in ").append(path)
+            logger.append("Failed creating file ").append(filename).append(" in ").append(path)
                     .append(". Exception: ").append(ex.getMessage())
                     .append("\n");
         }
-        return null;
+        throw new RuntimeException("Failed creating file " + filename + " in " + path);
     }
     public static void main(String[] args) throws Exception {
         List<String> directories = Arrays.asList("/src", "/res", "/savegames", "/temp", "/src/main", "/src/test");
@@ -140,9 +123,10 @@ public class Main {
 
         // Creating file for logging
         File log = createFile(PARENT_DIR + "/Games/temp", "temp.txt");
-        System.out.println(logger.toString());
-        if (log == null) throw new FileNotFoundException("Unable to create file for future logging.");
 
+        // Creating Main.java and Utils.java
+        createFile(PARENT_DIR + "/Games/src/main", "Main.java");
+        createFile(PARENT_DIR + "/Games/src/main", "Utils.java");
 
         // Initializing objects with random numbers, creating files for them and saving them.
         Random r = new Random();
@@ -160,7 +144,6 @@ public class Main {
         //      so I made a method that finds all of them, since it is better practice in my opinion.
         File[] filesToZip = findSaveFiles(PARENT_DIR + "/Games/savegames");
 
-
         zipFiles(filesToZip); // Method for finding, zipping and deleting GameProgress save files.
 
         // Stream for writing log; no try-catch to let program fall in case something goes wrong.
@@ -169,6 +152,7 @@ public class Main {
         );
 
         // Writing log, closing stream.
+        System.out.println(logger.toString());
         byte[] byteLog = logger.toString().getBytes();
         bos.write(byteLog, 0, byteLog.length);
         bos.flush(); bos.close();
