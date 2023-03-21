@@ -6,7 +6,6 @@ import java.util.zip.ZipOutputStream;
 
 public class Main {
     static StringBuilder logger = new StringBuilder();
-    static final int GAME_PROGRESS_AMT = 3; // Regulates amount of files in the archive
     static final String PARENT_DIR = System.getProperty("user.home");
 
     public static void openZip(String pathToZip, String pathWhereUnzip) {
@@ -38,21 +37,16 @@ public class Main {
     }
 
     public static GameProgress openProgress(String pathToFile) throws Exception {
-        int tempIndex = pathToFile.lastIndexOf("/");
-        String path = pathToFile.substring(0, tempIndex);
-        String saveName = pathToFile.substring(tempIndex + 1);
-        File save = new File(path, saveName);
         GameProgress gameProgress = null;
-        try (FileInputStream fis = new FileInputStream(save);
+        try (FileInputStream fis = new FileInputStream(pathToFile);
              ObjectInputStream ois = new ObjectInputStream(fis)) {
             gameProgress = (GameProgress) ois.readObject();
         } catch (Exception ex) {
-            logger.append("Exception in deserialization of ").append(saveName).append(" --> ").append(ex.getMessage())
+            logger.append("Exception in deserialization of ").append(pathToFile).append(" --> ").append(ex.getMessage())
                     .append("\n");
+            throw new FileNotFoundException("Failed to complete deserialization of " + pathToFile);
         }
-        if (gameProgress != null) {
-            return gameProgress;
-        } throw new RuntimeException("Failed to complete deserialization of " + saveName);
+        return gameProgress;
     }
 
     public static String getRandomFilename(){
@@ -111,7 +105,7 @@ public class Main {
     }
 
 
-    public static File saveGame(GameProgress gp){
+    public static void saveGame(GameProgress gp) throws FileNotFoundException {
         // Creating file for storing the object in proper directory with random filename.
         File save = createFile(PARENT_DIR + "/Games/savegames", getRandomFilename() + ".dat");
 
@@ -131,7 +125,6 @@ public class Main {
                     .append("\n");
         }
 
-        return save;
     }
 
     public static void createDirectory(String path){
@@ -145,7 +138,7 @@ public class Main {
         }
     }
 
-    public static File createFile(String path, String filename) {
+    public static File createFile(String path, String filename) throws FileNotFoundException {
         try {
             File f = new File(path, filename);
             if (f.createNewFile()) {
@@ -158,7 +151,8 @@ public class Main {
                     .append(". Exception: ").append(ex.getMessage())
                     .append("\n");
         }
-        throw new RuntimeException("Failed creating file " + filename + " in " + path);
+        // This exception is made to ensure that no value is returned
+        throw new FileNotFoundException("Failed creating file " + filename + " in " + path);
     }
     public static void main(String[] args) throws Exception {
         List<String> directories = Arrays.asList("/src", "/res", "/savegames", "/temp", "/src/main", "/src/test");
@@ -173,26 +167,24 @@ public class Main {
         createFile(PARENT_DIR + "/Games/src/main", "Utils.java");
         // Initializing objects with random numbers, creating files for them and saving them.
         Random r = new Random();
-        GameProgress[] progresses = new GameProgress[GAME_PROGRESS_AMT];
-        for (int i = 0; i < GAME_PROGRESS_AMT; i++) {
-            progresses[i] = new GameProgress( // Creating object
-                    r.nextInt(100),
-                    r.nextInt(100),
-                    r.nextInt(100),
-                    r.nextDouble());
-            saveGame(progresses[i]);    // Saving it
-        }
+        List<GameProgress> progresses = Arrays.asList(
+                new GameProgress( r.nextInt(100), r.nextInt(100), r.nextInt(100), r.nextDouble() ),
+                new GameProgress( r.nextInt(100), r.nextInt(100), r.nextInt(100), r.nextDouble() )
+        );
+
+        progresses.forEach(s -> {
+            try {
+                saveGame(s);
+            } catch (FileNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+        });    // Saving it
 
         // There were no instructions on how should I get the files to zip,
         //      so I made a method that finds all of them, since it is better practice in my opinion.
         File[] filesToZip = findSaveFiles(PARENT_DIR + "/Games/savegames");
 
         zipFiles(filesToZip); // Method for finding, zipping and deleting GameProgress save files.
-
-        // Stream for writing log; no try-catch to let program fall in case something goes wrong.
-        BufferedOutputStream bos = new BufferedOutputStream(
-                new FileOutputStream(log, true)
-        );
 
         // Works
         openZip(PARENT_DIR + "/Games/savegames/zip_saves.zip", PARENT_DIR + "/Games/src/test");
@@ -203,12 +195,14 @@ public class Main {
                 .toArray()[0];
 
         // Does not work
-//        openProgress(randomFileToShowThatOpenProgressWorks.getPath());
+        openProgress(randomFileToShowThatOpenProgressWorks.getPath());
 
-        // Writing log, closing stream.
-        System.out.println(logger.toString());
-        byte[] byteLog = logger.toString().getBytes();
-        bos.write(byteLog, 0, byteLog.length);
-        bos.flush(); bos.close();
+        // Writing log.
+        try (FileWriter fw = new FileWriter(log, true)){
+            fw.write(logger.toString());
+            fw.flush();
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
     }
 }
