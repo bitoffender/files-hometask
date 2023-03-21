@@ -1,15 +1,59 @@
 import java.io.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 public class Main {
     static StringBuilder logger = new StringBuilder();
     static final int GAME_PROGRESS_AMT = 3; // Regulates amount of files in the archive
     static final String PARENT_DIR = System.getProperty("user.home");
+
+    public static void openZip(String pathToZip, String pathWhereUnzip) {
+        int tempIndex = pathToZip.lastIndexOf("/");
+        String path = pathToZip.substring(0, tempIndex);
+        String zipName = pathToZip.substring(tempIndex);
+        File zipArchive = new File(path, zipName);
+        File outputDir = new File(pathWhereUnzip);
+
+        try (ZipInputStream zin = new ZipInputStream(new
+                FileInputStream(zipArchive))) {
+            ZipEntry entry;
+            String name;
+            while ((entry = zin.getNextEntry()) != null) {
+                name = entry.getName();
+                FileOutputStream fout = new FileOutputStream(new File(outputDir, name));
+                for (int c = zin.read(); c != -1; c = zin.read())
+                    fout.write(c);
+                fout.flush();
+                zin.closeEntry();
+                fout.close();
+            }
+        } catch (Exception ex) {
+            logger.append("Exception during unpacking archive ").append(zipName).append(" --> ").append(ex.getMessage())
+                    .append("\n");
+        }
+        logger.append("Successfully unpacked archive ").append(zipName).append(" to ").append(outputDir)
+                .append("\n");
+    }
+
+    public static GameProgress openProgress(String pathToFile) throws Exception {
+        int tempIndex = pathToFile.lastIndexOf("/");
+        String path = pathToFile.substring(0, tempIndex);
+        String saveName = pathToFile.substring(tempIndex + 1);
+        File save = new File(path, saveName);
+        GameProgress gameProgress = null;
+        try (FileInputStream fis = new FileInputStream(save);
+             ObjectInputStream ois = new ObjectInputStream(fis)) {
+            gameProgress = (GameProgress) ois.readObject();
+        } catch (Exception ex) {
+            logger.append("Exception in deserialization of ").append(saveName).append(" --> ").append(ex.getMessage())
+                    .append("\n");
+        }
+        if (gameProgress != null) {
+            return gameProgress;
+        } throw new RuntimeException("Failed to complete deserialization of " + saveName);
+    }
 
     public static String getRandomFilename(){
         StringBuilder sb = new StringBuilder();
@@ -40,7 +84,7 @@ public class Main {
         try (ZipOutputStream zout = new ZipOutputStream(new FileOutputStream(zipArchive))) {
             for (File file : files) {
                 try (FileInputStream fis = new FileInputStream(file)) {
-                    ZipEntry entry = new ZipEntry("packed_" + file.getName());
+                    ZipEntry entry = new ZipEntry(file.getName());
                     zout.putNextEntry(entry);
                     byte[] buffer = new byte[fis.available()];
                     zout.write(buffer);
@@ -51,7 +95,8 @@ public class Main {
                                 .append(" was added to zip archive and deleted successfully.")
                                 .append("\n");
                     else {
-                        logger.append("Failed deleting ").append(file.getName());
+                        logger.append("Failed deleting ").append(file.getName())
+                                .append("\n");
                     }
                 } catch (Exception ex) {
                     logger.append("File ").append(file.getName())
@@ -124,10 +169,8 @@ public class Main {
         // Creating file for logging
         File log = createFile(PARENT_DIR + "/Games/temp", "temp.txt");
 
-        // Creating Main.java and Utils.java
         createFile(PARENT_DIR + "/Games/src/main", "Main.java");
         createFile(PARENT_DIR + "/Games/src/main", "Utils.java");
-
         // Initializing objects with random numbers, creating files for them and saving them.
         Random r = new Random();
         GameProgress[] progresses = new GameProgress[GAME_PROGRESS_AMT];
@@ -150,6 +193,17 @@ public class Main {
         BufferedOutputStream bos = new BufferedOutputStream(
                 new FileOutputStream(log, true)
         );
+
+        // Works
+        openZip(PARENT_DIR + "/Games/savegames/zip_saves.zip", PARENT_DIR + "/Games/src/test");
+
+        File randomFileToShowThatOpenProgressWorks = (File) Arrays.stream(Objects.requireNonNull(new File
+                        (PARENT_DIR + "/Games/src/test").listFiles()))
+                .filter(s -> s.getName().startsWith("SAVE") && s.getName().endsWith(".dat"))
+                .toArray()[0];
+
+        // Does not work
+//        openProgress(randomFileToShowThatOpenProgressWorks.getPath());
 
         // Writing log, closing stream.
         System.out.println(logger.toString());
