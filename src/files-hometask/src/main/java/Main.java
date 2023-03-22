@@ -6,7 +6,8 @@ import java.util.zip.ZipOutputStream;
 
 public class Main {
     static StringBuilder logger = new StringBuilder();
-    static final String PARENT_DIR = System.getProperty("user.home");
+    static int createdFilesAmount = 0;
+    static final String PARENT_DIR = System.getProperty("user.home") + "/IdeaProjects/files-hometask/src/main/java";
 
     public static void openZip(String pathToZip, String pathWhereUnzip) {
         int tempIndex = pathToZip.lastIndexOf("/");
@@ -46,27 +47,15 @@ public class Main {
                     .append("\n");
             throw new FileNotFoundException("Failed to complete deserialization of " + pathToFile);
         }
+        System.out.println(gameProgress);
         return gameProgress;
-    }
-
-    public static String getRandomFilename(){
-        StringBuilder sb = new StringBuilder();
-        Random r = new Random();
-        sb.append("SAVE-");
-        for (int i = 0; i < 15; i++) {
-            if (i % 5 == 0 && i != 0) sb.append("-");
-            else sb.append((r.nextInt(0,3) == 2) ?
-                    (char)r.nextInt(48,57) :
-                    (char)r.nextInt(65,90));
-        }
-        return sb.toString();
     }
 
     public static File[] findSaveFiles(String directory){
         List<File> saveFiles = new ArrayList<>();
         for (File item: new File(directory).listFiles()) {
             String name = item.getName();
-            if (name.startsWith("SAVE") && name.endsWith(".dat"))
+            if (name.startsWith("save") && name.endsWith(".dat"))
                 saveFiles.add(item);
         }
         return saveFiles.toArray(new File[0]);
@@ -107,7 +96,9 @@ public class Main {
 
     public static void saveGame(GameProgress gp) throws FileNotFoundException {
         // Creating file for storing the object in proper directory with random filename.
-        File save = createFile(PARENT_DIR + "/Games/savegames", getRandomFilename() + ".dat");
+        File save = createFile(PARENT_DIR + "/Games/savegames",  "save" +
+                createdFilesAmount + ".dat");
+        createdFilesAmount += 1;
 
         // Serialization of the GameProgress object
         try (FileOutputStream fos = new FileOutputStream(save);
@@ -124,6 +115,7 @@ public class Main {
             logger.append("Failed saving the game into ").append(save.getName())
                     .append("\n");
         }
+
 
     }
 
@@ -167,10 +159,13 @@ public class Main {
         createFile(PARENT_DIR + "/Games/src/main", "Utils.java");
         // Initializing objects with random numbers, creating files for them and saving them.
         Random r = new Random();
-        List<GameProgress> progresses = Arrays.asList(
-                new GameProgress( r.nextInt(100), r.nextInt(100), r.nextInt(100), r.nextDouble() ),
-                new GameProgress( r.nextInt(100), r.nextInt(100), r.nextInt(100), r.nextDouble() )
-        );
+        // This looks more accurate than writing same thing 4 times
+        List<GameProgress> progresses = new ArrayList<>();
+        for (int i = 0; i < 4; i++)
+            progresses.add(
+                    new GameProgress( r.nextInt(100), r.nextInt(100), r.nextInt(100), r.nextDouble())
+            );
+
 
         progresses.forEach(s -> {
             try {
@@ -191,7 +186,7 @@ public class Main {
 
         File randomFileToShowThatOpenProgressWorks = (File) Arrays.stream(Objects.requireNonNull(new File
                         (PARENT_DIR + "/Games/src/test").listFiles()))
-                .filter(s -> s.getName().startsWith("SAVE") && s.getName().endsWith(".dat"))
+                .filter(s -> s.getName().startsWith("save") && s.getName().endsWith(".dat"))
                 .toArray()[0];
 
         // Does not work
